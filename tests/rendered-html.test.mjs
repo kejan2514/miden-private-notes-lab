@@ -29,14 +29,16 @@ test("server-renders the Miden lab", async () => {
 });
 
 test("keeps live SDK data separate from demo data", async () => {
-  const source = await readFile(new URL("../app/MidenLab.tsx", import.meta.url), "utf8");
+  const shellSource = await readFile(new URL("../app/MidenLab.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../app/MidenLiveWorkspace.tsx", import.meta.url), "utf8");
   const packageJson = await readFile(new URL("../package.json", import.meta.url), "utf8");
 
   assert.match(source, /@miden-sdk\/react\/lazy/);
   assert.match(source, /rpcUrl: "testnet"/);
-  assert.match(source, /Demo dataset/);
+  assert.match(shellSource, /Demo dataset/);
   assert.match(source, /useCreateWallet/);
   assert.match(source, /useNotes/);
+  assert.match(shellSource, /ssr: false/);
   assert.match(packageJson, /"@miden-sdk\/react"/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 });
