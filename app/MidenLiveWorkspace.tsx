@@ -5,9 +5,11 @@ import { MidenProvider, useCreateWallet, useMiden, useNotes } from "@miden-sdk/r
 
 function LiveContent() {
   const { isReady, isInitializing, sync, error: clientError } = useMiden();
-  const { createWallet, wallet, isCreating, error: walletError } = useCreateWallet();
+  const { createWallet, wallet, isCreating, error: walletError, reset } = useCreateWallet();
   const { noteSummaries, consumableNoteSummaries, isLoading, refetch, error: notesError } = useNotes();
   const [syncing, setSyncing] = useState(false);
+  const [creationMessage, setCreationMessage] = useState("");
+  const [creatingLocally, setCreatingLocally] = useState(false);
 
   const walletId = useMemo(() => {
     if (!wallet) return null;
@@ -17,6 +19,29 @@ function LiveContent() {
   async function handleSync() {
     setSyncing(true);
     try { await sync(); await refetch(); } finally { setSyncing(false); }
+  }
+
+  async function handleCreateWallet() {
+    setCreatingLocally(true);
+    setCreationMessage("Generating private account keys in this browser…");
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        createWallet({ storageMode: "private" }),
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error("Wallet creation timed out")), 30000);
+        }),
+      ]);
+      setCreationMessage("Private wallet created successfully.");
+    } catch (error) {
+      reset();
+      setCreationMessage(error instanceof Error && error.message === "Wallet creation timed out"
+        ? "Creation took too long. Reload the testnet client and try again."
+        : error instanceof Error ? error.message : "Wallet creation failed. Please try again.");
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+      setCreatingLocally(false);
+    }
   }
 
   return <>
@@ -34,7 +59,10 @@ function LiveContent() {
       <section className="panel wallet-panel">
         <PanelHeading eyebrow="LOCAL WALLET" title="Private account workspace" action="Testnet" />
         <div className="wallet-visual"><div className="wallet-orbit"><span>M</span></div><p>{walletId ?? "No local wallet yet"}</p></div>
-        <button className="primary-button wide" onClick={() => createWallet({ storageMode: "private" })} disabled={!isReady || isCreating}>{isCreating ? "Creating account…" : walletId ? "Create another private wallet" : "Create private wallet"}</button>
+        <button className="primary-button wide" onClick={handleCreateWallet} disabled={!isReady || isCreating || creatingLocally}>{isCreating || creatingLocally ? "Generating private keys…" : walletId ? "Create another private wallet" : "Create private wallet"}</button>
+        {(isCreating || creatingLocally) && <p className="creation-hint">This normally takes a few seconds and can take up to 30 seconds.</p>}
+        {creationMessage && !walletError && <p className="creation-hint">{creationMessage}</p>}
+        {creationMessage.includes("Reload") && <button className="ghost-button wide" onClick={() => window.location.reload()}>Reload testnet client</button>}
         <p className="error-text">{clientError?.message || walletError?.message || notesError?.message || ""}</p>
       </section>
       <section className="panel live-notes">
