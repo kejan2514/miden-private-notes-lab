@@ -20,6 +20,7 @@ Miden moves transaction execution and proof generation to the client. This lab t
 - Protocol-level note PoC with target-account binding
 - Issuer-authenticated credential note using active-note sender metadata
 - Detached issuer-attestation payment scaffold that separates payer and policy authority
+- Executable deterministic PASS/FAIL fixture matrix in CI
 - Credential commitment that replaces sender-controlled boolean policy flags
 - Selective-disclosure scenarios for audit/review use cases
 
@@ -37,7 +38,17 @@ The protocol PoC under `poc/policy-gated-note/` now contains two enforcement mod
 
 `detached-attestation-payment.masm` separates payer and policy authority. The payer can fund the payment note while a distinct authority creates an attestation note. The payment note requires that exact attestation note in the same transaction and checks its sender and storage commitment using Miden input-note primitives before assets move.
 
-This detached flow is intentionally labeled an experimental scaffold until executable Miden fixtures validate the exact stack choreography and positive/negative transactions.
+### PASS/FAIL fixtures
+
+`poc/policy-gated-note/fixtures/` contains an executable deterministic transaction-policy matrix covering:
+
+- valid detached attestation -> PASS
+- missing attestation -> `ERR_ATTESTATION_NOT_FOUND`
+- wrong issuer -> `ERR_ISSUER_ACCOUNT_MISMATCH`
+- wrong recipient -> `ERR_TARGET_ACCOUNT_MISMATCH`
+- wrong attestation commitment -> `ERR_ATTESTATION_COMMITMENT_MISMATCH`
+
+These fixtures run in the normal Node CI suite. They validate scenario semantics and expected failure mapping; they are not a substitute for executing the MASM inside Miden VM. A separate Miden 0.15 compile/VM fixture remains the next protocol-validation layer.
 
 Read:
 
@@ -64,6 +75,7 @@ The project distinguishes these categories explicitly:
 - `@miden-sdk/react`
 - `@miden-sdk/miden-sdk`
 - Miden Assembly PoC note scripts
+- Node executable fixtures
 - vinext and Vite
 - Cloudflare-compatible deployment output
 
@@ -80,6 +92,12 @@ Production validation:
 
 ```bash
 npm test
+```
+
+Run only the detached-attestation fixture matrix:
+
+```bash
+node poc/policy-gated-note/fixtures/run-fixtures.mjs
 ```
 
 ## Project structure
@@ -100,10 +118,14 @@ poc/
     ├── policy-gated-note.masm
     ├── detached-attestation-payment.masm
     ├── CREDENTIAL_MODEL.md
-    └── README.md
+    ├── README.md
+    └── fixtures/
+        ├── cases.json
+        └── run-fixtures.mjs
 tests/
 ├── policy-gated-note.test.mjs
 ├── detached-attestation-payment.test.mjs
+├── detached-attestation-fixtures.test.mjs
 └── rendered-html.test.mjs
 ```
 
@@ -119,8 +141,9 @@ tests/
 - [x] Replace boolean policy flags with a credential commitment
 - [x] Authenticate issuer by binding note sender metadata to the committed issuer account ID
 - [x] Add independent payer + issuer attestation scaffold
+- [x] Add executable deterministic PASS/FAIL transaction-policy fixtures
+- [ ] Compile and execute detached MASM with Miden 0.15 VM/client fixtures
 - [ ] Bind credential contents to asset, policy version, expiry, and nonce
-- [ ] Add executable Miden PASS/FAIL transaction fixtures
 - [ ] Add testnet asset transfer form
 - [ ] Add note consumption flow
 - [ ] Add selective disclosure proof prototype
@@ -130,7 +153,7 @@ tests/
 
 This project is an educational testnet application and protocol PoC. Do not use test interfaces with valuable assets or treat the code as audited production software.
 
-The detached issuer-attestation flow separates payer and policy authority by requiring a distinct authority-created input note in the same transaction. The current MASM implementation remains an experimental scaffold until executable transaction fixtures confirm the exact stack behavior. Production compliance enforcement should additionally bind credential contents to asset, policy version, expiry, nonce, and revocation state.
+The detached issuer-attestation flow separates payer and policy authority by requiring a distinct authority-created input note in the same transaction. The deterministic fixtures validate the intended policy outcomes, while full Miden VM execution is still required to confirm exact MASM stack behavior. Production compliance enforcement should additionally bind credential contents to asset, policy version, expiry, nonce, and revocation state.
 
 ## References
 
