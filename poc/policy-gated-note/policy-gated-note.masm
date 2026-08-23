@@ -1,14 +1,19 @@
-#! Policy-gated private payment note — Miden 0.15 PoC
+#! Credential-gated private payment note — Miden 0.15 PoC
 #!
-#! Storage layout (5 felts):
+#! Storage layout (6 felts):
 #! [0] target account suffix
 #! [1] target account prefix
-#! [2] recipient_allowed (1 = pass)
-#! [3] asset_allowed (1 = pass)
-#! [4] jurisdiction_allowed (1 = pass)
+#! [2..5] expected policy credential digest
 #!
-#! IMPORTANT: the three policy flags are still PoC inputs. A production design
-#! must derive/verify them cryptographically or via an authorized policy account.
+#! Inputs (note arguments): [POLICY_CREDENTIAL_PREIMAGE]
+#!
+#! The note can be consumed only when:
+#! 1. the executing account matches the target account, and
+#! 2. the credential preimage hashes to the commitment stored in the note.
+#!
+#! Trust model: this PoC assumes the credential commitment came from an
+#! authorized policy issuer. It does NOT yet verify an issuer signature or
+#! an on-chain policy-account attestation. That is the next hardening step.
 
 use miden::protocol::active_account
 use miden::protocol::account_id
@@ -18,31 +23,37 @@ use miden::standards::wallets::basic as basic_wallet
 const STORAGE_PTR=0
 const TARGET_ACCOUNT_ID_SUFFIX_PTR=STORAGE_PTR
 const TARGET_ACCOUNT_ID_PREFIX_PTR=STORAGE_PTR+1
-const RECIPIENT_ALLOWED_PTR=STORAGE_PTR+2
-const ASSET_ALLOWED_PTR=STORAGE_PTR+3
-const JURISDICTION_ALLOWED_PTR=STORAGE_PTR+4
+const CREDENTIAL_DIGEST_PTR=STORAGE_PTR+2
 
-const ERR_UNEXPECTED_STORAGE_ITEMS="Policy-gated note expects exactly 5 storage items"
-const ERR_TARGET_ACCOUNT_MISMATCH="Policy-gated note target account does not match executing account"
-const ERR_RECIPIENT_POLICY="Recipient policy failed"
-const ERR_ASSET_POLICY="Asset policy failed"
-const ERR_JURISDICTION_POLICY="Jurisdiction policy failed"
+const ERR_UNEXPECTED_STORAGE_ITEMS="Credential-gated note expects exactly 6 storage items"
+const ERR_TARGET_ACCOUNT_MISMATCH="Credential-gated note target account does not match executing account"
+const ERR_CREDENTIAL_MISMATCH="Policy credential does not match committed credential"
 
 @note_script
 pub proc main
+    # Note arguments carry the private credential preimage. Hash it first so
+    # the raw credential never has to be stored in public note storage.
+    hash
+    # => [COMPUTED_CREDENTIAL_DIGEST]
+
+    # Load target account ID + expected credential digest into memory.
     push.STORAGE_PTR exec.active_note::get_storage
-    eq.5 assert.err=ERR_UNEXPECTED_STORAGE_ITEMS
+    eq.6 assert.err=ERR_UNEXPECTED_STORAGE_ITEMS
+    # => [COMPUTED_CREDENTIAL_DIGEST]
 
     # Recipient binding — same account-id comparison pattern used by P2ID.
     mem_load.TARGET_ACCOUNT_ID_PREFIX_PTR
     mem_load.TARGET_ACCOUNT_ID_SUFFIX_PTR
     exec.active_account::get_id
     exec.account_id::eq assert.err=ERR_TARGET_ACCOUNT_MISMATCH
+    # => [COMPUTED_CREDENTIAL_DIGEST]
 
-    # Policy gates. Assets move only after every assertion succeeds.
-    mem_load.RECIPIENT_ALLOWED_PTR eq.1 assert.err=ERR_RECIPIENT_POLICY
-    mem_load.ASSET_ALLOWED_PTR eq.1 assert.err=ERR_ASSET_POLICY
-    mem_load.JURISDICTION_ALLOWED_PTR eq.1 assert.err=ERR_JURISDICTION_POLICY
+    # Load the credential commitment from note storage and compare it with
+    # the digest computed from the private note argument.
+    padw push.CREDENTIAL_DIGEST_PTR mem_loadw_le
+    assert_eqw.err=ERR_CREDENTIAL_MISMATCH
+    # => []
 
+    # Assets move only after both recipient binding and credential proof pass.
     exec.basic_wallet::move_note_assets_to_account
 end
