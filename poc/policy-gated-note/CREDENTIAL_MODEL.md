@@ -1,40 +1,44 @@
-# Credential commitment model
+# Issuer-authenticated credential model
 
-This PoC replaces sender-controlled boolean policy flags with a single private credential proof.
+This PoC replaces sender-controlled policy booleans with an issuer-authenticated credential commitment.
 
-## Flow
+## Storage
 
-1. A policy issuer evaluates the intended recipient under whatever off-chain policy is required (for example recipient eligibility, asset policy, and jurisdiction rules).
-2. The issuer provides the eligible recipient with a private credential preimage.
-3. The note stores only the credential digest commitment together with the target account ID.
-4. At consumption time, the recipient supplies the private credential as note arguments.
-5. The note script hashes the supplied credential and requires it to equal the stored commitment.
-6. The script also requires the executing account to equal the target account ID.
-7. Assets move only if both checks pass.
+The note stores:
 
-## What this improves
+- target account ID (2 felts)
+- authorized issuer account ID (2 felts)
+- credential digest (4 felts)
 
-The spender can no longer flip three public `1/0` policy values to make a payment pass. The spending condition is now possession of a secret whose digest was committed when the note was created.
+The credential preimage is supplied privately as note arguments and is not stored in note storage.
 
-## Remaining trust assumption
+## Enforcement order
 
-This is **not yet a cryptographic proof that an authorized issuer created the credential**. The PoC assumes the commitment placed into the note came from the intended policy authority.
+The note script performs three checks before assets can move:
 
-A production design should replace that assumption with one of these patterns:
+1. **Issuer authentication** — `active_note::get_sender` must match the issuer account ID committed in storage.
+2. **Recipient binding** — `active_account::get_id` must match the target account ID committed in storage.
+3. **Credential possession** — the private credential preimage is hashed and must match the committed digest.
 
-- a signature/attestation verified against an authorized issuer key,
-- an on-chain policy account whose state is read or proven during consumption, or
-- a zero-knowledge credential proof bound to the recipient, asset, policy version, and expiry.
+Only after all three checks succeed does the script call the basic wallet asset-move procedure.
 
-## Recommended credential binding
+## Why the issuer check is meaningful
 
-The credential material should commit to at least:
+The active-note sender is protocol metadata, not a caller-provided flag. Requiring it to match the issuer account means the issuer account itself must create the note. The note-creation transaction therefore inherits the issuer account's normal Miden authentication requirements.
 
-- target account ID,
-- asset/faucet ID or policy class,
-- jurisdiction/policy identifier,
-- policy version,
-- expiry or validity window,
-- a nonce to prevent credential reuse where required.
+This avoids pretending that a plain `issuer_id` field or `approved = 1` value proves authorization.
 
-That prevents a valid credential for one context from being replayed in another.
+## Limitation
+
+The current model couples **issuer** and **note creator/payer**. It does not yet support Alice funding a payment while a separate policy authority independently signs the credential.
+
+A stronger next design can decouple those roles using one of these mechanisms:
+
+- a detached issuer signature verified by the note or an account component,
+- an on-chain policy account with an attestation procedure,
+- a separate attestation note consumed in the same transaction,
+- a ZK credential proof bound to issuer, recipient, asset, policy version, expiry, nonce, and revocation state.
+
+## Security status
+
+Educational PoC only. This code has not been audited and should not be used with valuable assets.
