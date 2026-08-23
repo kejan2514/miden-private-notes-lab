@@ -1,46 +1,29 @@
-# Policy-gated private note PoC
+# Policy-gated note PoC
 
-This directory moves the Programmable Privacy demo one layer closer to protocol enforcement.
+This directory contains an educational Miden note-script PoC for programmable privacy with issuer-authenticated credential gating.
 
-## Goal
+## Current enforcement
 
-A private payment note should only be consumable when its policy conditions pass. The note script is the enforcement boundary: failed assertions abort consumption before assets are received.
+Before assets move, the note script requires:
 
-## Current scaffold
+1. the active note sender to match the authorized issuer account ID stored in the note,
+2. the executing account to match the intended target account ID, and
+3. the private credential preimage to hash to the committed credential digest.
 
-`policy-gated-note.masm` targets the Miden 0.15 note-script shape (`@note_script` + `pub proc main`). It models three gates:
+Because the issuer must be the actual note creator, issuance inherits the issuer account's normal Miden transaction authentication.
 
-1. recipient is allowed
-2. asset is allowed
-3. jurisdiction is allowed
+## Storage layout
 
-All three must equal `1` before the receive path can execute.
+Eight felts are used:
 
-## Security boundary
+- target account suffix
+- target account prefix
+- issuer account suffix
+- issuer account prefix
+- four felts for the credential digest
 
-The current flags are **PoC inputs**, not trusted compliance facts. A sender could otherwise choose `1,1,1`. Production enforcement therefore requires the flags to be replaced by verifiable evidence, for example:
+## Important limitation
 
-- an authorized policy/account component,
-- a commitment plus proof checked by the script/account,
-- or a trusted attestation whose authority is bound in account state.
+This model couples the issuer and note creator. It does not yet support an unrelated payer funding a note while a separate authority signs the credential. That next step should use a detached signature, policy account, attestation note, or ZK credential proof.
 
-This distinction is intentional: the repository must not claim real compliance enforcement until the policy facts are cryptographically authenticated.
-
-## Next implementation milestones
-
-- Match the current Miden 0.15 standard P2ID recipient-binding flow.
-- Replace boolean policy inputs with authenticated policy evidence.
-- Compile the script with the Miden 0.15 toolchain.
-- Add positive and negative execution tests.
-- Wire note creation/consumption into the browser lab and testnet client.
-
-## Expected tests
-
-| recipient | asset | jurisdiction | result |
-|---|---|---|---|
-| 1 | 1 | 1 | consume allowed |
-| 0 | 1 | 1 | abort |
-| 1 | 0 | 1 | abort |
-| 1 | 1 | 0 | abort |
-
-This is an educational protocol PoC and is not audited production code.
+This is not audited production code.
