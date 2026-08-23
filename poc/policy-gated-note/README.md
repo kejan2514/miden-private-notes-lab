@@ -1,29 +1,36 @@
 # Policy-gated note PoC
 
-This directory contains an educational Miden note-script PoC for programmable privacy with issuer-authenticated credential gating.
+This directory contains educational Miden note-script PoCs for programmable privacy and compliance-style gating.
 
-## Current enforcement
+## Implemented models
 
-Before assets move, the note script requires:
+### 1. Issuer-created credential note
 
-1. the active note sender to match the authorized issuer account ID stored in the note,
-2. the executing account to match the intended target account ID, and
-3. the private credential preimage to hash to the committed credential digest.
+`policy-gated-note.masm` authenticates the note creator as the issuer, binds consumption to the target account, and requires a matching private credential commitment before assets move.
 
-Because the issuer must be the actual note creator, issuance inherits the issuer account's normal Miden transaction authentication.
+This model is simple and strong, but couples the issuer and note creator.
 
-## Storage layout
+### 2. Detached issuer attestation
 
-Eight felts are used:
+`detached-attestation-payment.masm` separates payer and policy issuer.
 
-- target account suffix
-- target account prefix
-- issuer account suffix
-- issuer account prefix
-- four felts for the credential digest
+The payer can create and fund the payment note. A separate policy authority creates an attestation note. The payment note requires that exact attestation note to be included as another transaction input and verifies:
 
-## Important limitation
+1. the executing account matches the payment target,
+2. the required attestation note is present among transaction inputs,
+3. the attestation note sender matches the authorized issuer account, and
+4. the attestation note storage commitment matches the commitment required by the payment note.
 
-This model couples the issuer and note creator. It does not yet support an unrelated payer funding a note while a separate authority signs the credential. That next step should use a detached signature, policy account, attestation note, or ZK credential proof.
+Assets move only after all four checks succeed.
 
-This is not audited production code.
+## Why this matters
+
+The detached model removes the earlier requirement that the policy issuer also fund or create the payment note. The issuer's authority comes from protocol-authenticated note metadata (`input_note::get_sender`), while the attestation payload is bound through the input note's storage commitment.
+
+## Remaining work
+
+The detached model is still an experimental scaffold. Before testnet claims, we need executable Miden fixtures that compile and exercise the full stack choreography with positive and negative transactions.
+
+A production credential should bind at least recipient, asset or policy class, policy version, expiry, nonce, and revocation context.
+
+This code is not audited production software.
