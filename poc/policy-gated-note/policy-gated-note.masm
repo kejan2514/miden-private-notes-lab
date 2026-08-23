@@ -1,42 +1,48 @@
 #! Policy-gated private payment note — Miden 0.15 PoC
 #!
-#! Storage layout:
-#! [0] recipient account suffix
-#! [1] recipient account prefix
+#! Storage layout (5 felts):
+#! [0] target account suffix
+#! [1] target account prefix
 #! [2] recipient_allowed (1 = pass)
 #! [3] asset_allowed (1 = pass)
 #! [4] jurisdiction_allowed (1 = pass)
 #!
-#! IMPORTANT: the three policy flags are PoC inputs. A production design must
-#! derive/verify them cryptographically or from an authorized account/policy
-#! component; sender-supplied booleans alone are not compliance enforcement.
+#! IMPORTANT: the three policy flags are still PoC inputs. A production design
+#! must derive/verify them cryptographically or via an authorized policy account.
 
-use.miden::protocol::account
-use.miden::protocol::note
-use.miden::standards::wallets::basic
+use miden::protocol::active_account
+use miden::protocol::account_id
+use miden::protocol::active_note
+use miden::standards::wallets::basic as basic_wallet
+
+const STORAGE_PTR=0
+const TARGET_ACCOUNT_ID_SUFFIX_PTR=STORAGE_PTR
+const TARGET_ACCOUNT_ID_PREFIX_PTR=STORAGE_PTR+1
+const RECIPIENT_ALLOWED_PTR=STORAGE_PTR+2
+const ASSET_ALLOWED_PTR=STORAGE_PTR+3
+const JURISDICTION_ALLOWED_PTR=STORAGE_PTR+4
+
+const ERR_UNEXPECTED_STORAGE_ITEMS="Policy-gated note expects exactly 5 storage items"
+const ERR_TARGET_ACCOUNT_MISMATCH="Policy-gated note target account does not match executing account"
+const ERR_RECIPIENT_POLICY="Recipient policy failed"
+const ERR_ASSET_POLICY="Asset policy failed"
+const ERR_JURISDICTION_POLICY="Jurisdiction policy failed"
 
 @note_script
 pub proc main
-    # Read the five policy/recipient fields from active-note storage.
-    exec.note::get_inputs
+    push.STORAGE_PTR exec.active_note::get_storage
+    eq.5 assert.err=ERR_UNEXPECTED_STORAGE_ITEMS
 
-    # Expected input count is five.
-    dup.0 push.5 assert_eq
+    # Recipient binding — same account-id comparison pattern used by P2ID.
+    mem_load.TARGET_ACCOUNT_ID_PREFIX_PTR
+    mem_load.TARGET_ACCOUNT_ID_SUFFIX_PTR
+    exec.active_account::get_id
+    exec.account_id::eq assert.err=ERR_TARGET_ACCOUNT_MISMATCH
 
-    # Drop count and leave the five inputs available to the script.
-    drop
+    # Policy gates. Assets move only after every assertion succeeds.
+    mem_load.RECIPIENT_ALLOWED_PTR eq.1 assert.err=ERR_RECIPIENT_POLICY
+    mem_load.ASSET_ALLOWED_PTR eq.1 assert.err=ERR_ASSET_POLICY
+    mem_load.JURISDICTION_ALLOWED_PTR eq.1 assert.err=ERR_JURISDICTION_POLICY
 
-    # PoC policy gate: each flag must equal 1.
-    # Stack ordering is intentionally documented/tested before testnet use.
-    # This file is a protocol-level scaffold, not yet claimed as deployed.
-    dup.0 push.1 assert_eq
-    dup.1 push.1 assert_eq
-    dup.2 push.1 assert_eq
-
-    # Recipient binding should follow the standard P2ID account-id comparison
-    # and asset movement flow. We keep that final wiring explicit as the next
-    # testnet milestone rather than pretending this scaffold is production-ready.
-
-    # Move the note assets only after all policy assertions pass.
-    call.basic::receive_asset
+    exec.basic_wallet::move_note_assets_to_account
 end
