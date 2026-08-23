@@ -1,0 +1,42 @@
+[
+  {
+    "name": "pass-valid-detached-attestation",
+    "targetMatches": true,
+    "attestationPresent": true,
+    "issuerMatches": true,
+    "commitmentMatches": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "fail-missing-attestation",
+    "targetMatches": true,
+    "attestationPresent": false,
+    "issuerMatches": true,
+    "commitmentMatches": true,
+    "expected": "ERR_ATTESTATION_NOT_FOUND"
+  },
+  {
+    "name": "fail-wrong-issuer",
+    "targetMatches": true,
+    "attestationPresent": true,
+    "issuerMatches": false,
+    "commitmentMatches": true,
+    "expected": "ERR_ISSUER_ACCOUNT_MISMATCH"
+  },
+  {
+    "name": "fail-wrong-recipient",
+    "targetMatches": false,
+    "attestationPresent": true,
+    "issuerMatches": true,
+    "commitmentMatches": true,
+    "expected": "ERR_TARGET_ACCOUNT_MISMATCH"
+  },
+  {
+    "name": "fail-wrong-attestation-commitment",
+    "targetMatches": true,
+    "attestationPresent": true,
+    "issuerMatches": true,
+    "commitmentMatches": false,
+    "expected": "ERR_ATTESTATION_COMMITMENT_MISMATCH"
+  }
+]
