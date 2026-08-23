@@ -1,0 +1,90 @@
+#! Detached issuer-attestation payment note — Miden PoC
+#!
+#! Goal: decouple the payer (payment-note creator) from the policy issuer.
+#! The payment note is funded/created by the payer, while a separate input
+#! attestation note is created by the authorized policy authority.
+#!
+#! Payment-note storage layout (12 felts):
+#! [0] target account suffix
+#! [1] target account prefix
+#! [2] authorized issuer account suffix
+#! [3] authorized issuer account prefix
+#! [4..7] required attestation note ID
+#! [8..11] required attestation storage commitment
+#!
+#! The required attestation note must be included as another input note in the
+#! same transaction. The payment note authenticates that input using protocol
+#! data rather than caller-supplied booleans.
+#!
+#! IMPORTANT: this file is an experimental protocol-level scaffold. The exact
+#! stack choreography must be exercised by executable Miden transaction fixtures
+#! before this is described as production-ready.
+
+use miden::protocol::active_account
+use miden::protocol::account_id
+use miden::protocol::active_note
+use miden::protocol::input_note
+use miden::core::word
+use miden::standards::wallets::basic as basic_wallet
+
+const STORAGE_PTR=0
+const TARGET_ACCOUNT_ID_SUFFIX_PTR=STORAGE_PTR
+const TARGET_ACCOUNT_ID_PREFIX_PTR=STORAGE_PTR+1
+const ISSUER_ACCOUNT_ID_SUFFIX_PTR=STORAGE_PTR+2
+const ISSUER_ACCOUNT_ID_PREFIX_PTR=STORAGE_PTR+3
+const ATTESTATION_NOTE_ID_PTR=STORAGE_PTR+4
+const ATTESTATION_STORAGE_COMMITMENT_PTR=STORAGE_PTR+8
+
+const ERR_UNEXPECTED_STORAGE_ITEMS="Detached-attestation payment expects exactly 12 storage items"
+const ERR_TARGET_ACCOUNT_MISMATCH="Payment target does not match executing account"
+const ERR_ATTESTATION_NOT_FOUND="Required policy attestation note is not an input"
+const ERR_ISSUER_ACCOUNT_MISMATCH="Attestation note sender is not the authorized issuer"
+const ERR_ATTESTATION_COMMITMENT_MISMATCH="Attestation storage commitment does not match payment requirement"
+
+@note_script
+pub proc main
+    # Load the payment policy requirements.
+    push.STORAGE_PTR exec.active_note::get_storage
+    eq.12 assert.err=ERR_UNEXPECTED_STORAGE_ITEMS
+
+    # 1) Recipient binding.
+    mem_load.TARGET_ACCOUNT_ID_PREFIX_PTR
+    mem_load.TARGET_ACCOUNT_ID_SUFFIX_PTR
+    exec.active_account::get_id
+    exec.account_id::eq assert.err=ERR_TARGET_ACCOUNT_MISMATCH
+
+    # 2) Locate the exact issuer attestation note among this transaction's
+    # input notes. `find_note` authenticates a claimed match against the note ID
+    # cached by the transaction prologue.
+    padw push.ATTESTATION_NOTE_ID_PTR mem_loadw_le
+    exec.input_note::find_note
+    # => [is_found, attestation_note_idx]
+    assert.err=ERR_ATTESTATION_NOT_FOUND
+    # => [attestation_note_idx]
+
+    # Keep the index for both sender and storage-commitment checks.
+    dup
+
+    # 3) Authenticate issuer from the attestation note's protocol metadata.
+    exec.input_note::get_sender
+    # => [issuer_sender_suffix, issuer_sender_prefix, attestation_note_idx]
+    mem_load.ISSUER_ACCOUNT_ID_PREFIX_PTR
+    mem_load.ISSUER_ACCOUNT_ID_SUFFIX_PTR
+    # Compare using the standard AccountId equality primitive.
+    exec.account_id::eq assert.err=ERR_ISSUER_ACCOUNT_MISMATCH
+    # => [attestation_note_idx]
+
+    # 4) Authenticate the attestation payload by comparing the input note's
+    # storage commitment to the commitment required by the payment note.
+    exec.input_note::get_storage_info
+    # => [ATTESTATION_STORAGE_COMMITMENT, num_storage_items]
+    drop
+    # => [ATTESTATION_STORAGE_COMMITMENT]
+
+    padw push.ATTESTATION_STORAGE_COMMITMENT_PTR mem_loadw_le
+    exec.word::eq assert.err=ERR_ATTESTATION_COMMITMENT_MISMATCH
+
+    # 5) Assets move only after target, attestation presence, issuer, and
+    # attestation-payload commitment checks all pass.
+    exec.basic_wallet::move_note_assets_to_account
+end
