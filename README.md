@@ -18,6 +18,7 @@ Miden moves transaction execution and proof generation to the client. This lab t
 - Visual explanation of local execution, proving, and submission
 - Programmable Privacy UI simulator for private payments + policy checks
 - Protocol-level note PoC with target-account binding
+- Issuer-authenticated credential note using active-note sender metadata
 - Credential commitment that replaces sender-controlled boolean policy flags
 - Selective-disclosure scenarios for audit/review use cases
 
@@ -25,12 +26,15 @@ Miden moves transaction execution and proof generation to the client. This lab t
 
 The UI demonstrates private payment policy flows without claiming that UI state is protocol enforcement.
 
-The protocol PoC under `poc/policy-gated-note/` now enforces two spending conditions before assets can move:
+The protocol PoC under `poc/policy-gated-note/` now enforces three conditions before assets can move:
 
-1. the executing account must match the target account embedded in note storage, and
-2. the spender must provide a private credential preimage whose hash matches the credential commitment embedded in note storage.
+1. the note's real sender must match the authorized issuer account ID committed in note storage,
+2. the executing account must match the target account embedded in note storage, and
+3. the spender must provide a private credential preimage whose hash matches the credential commitment embedded in note storage.
 
-This is stronger than public `1/0` policy flags, but it still assumes the committed credential came from an authorized policy issuer. It does **not** yet verify an issuer signature or policy-account attestation.
+The issuer check uses Miden active-note sender metadata. Because the issuer account must create the note, authorization is inherited from the issuer account's normal transaction authentication rather than from an unauthenticated boolean stored by the sender.
+
+This is a stronger educational model, but it has an explicit limitation: the issuer is also the note creator. A future design for an independent payer plus separate issuer should use a signed credential, policy account, attestation note, or ZK proof rather than duplicating issuer identity as plain storage data.
 
 Read:
 
@@ -107,7 +111,8 @@ tests/
 - [x] Add Programmable Privacy UI panel
 - [x] Add target-account recipient binding
 - [x] Replace boolean policy flags with a credential commitment
-- [ ] Verify an authorized issuer attestation or policy-account proof
+- [x] Authenticate issuer by binding note sender metadata to the committed issuer account ID
+- [ ] Support independent payer + issuer attestation
 - [ ] Bind credential contents to asset, policy version, expiry, and nonce
 - [ ] Add executable Miden PASS/FAIL transaction fixtures
 - [ ] Add testnet asset transfer form
@@ -119,7 +124,7 @@ tests/
 
 This project is an educational testnet application and protocol PoC. Do not use test interfaces with valuable assets or treat the code as audited production software.
 
-A hash commitment proves possession of a matching secret; by itself it does not prove which issuer authorized that secret. Production compliance enforcement requires authenticated issuer/policy verification and replay/expiry protections.
+The current issuer-authenticated flow requires the issuer account to create the note. It does not yet verify a detached issuer signature for notes funded by an unrelated payer. Production compliance enforcement should additionally bind credential contents to asset, policy version, expiry, nonce, and revocation state.
 
 ## References
 
