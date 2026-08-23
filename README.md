@@ -6,7 +6,7 @@ An interactive developer lab for exploring private notes, browser-local accounts
 
 ## Why this project exists
 
-Miden moves transaction execution and proof generation to the client. That architecture is powerful, but it can be difficult to understand from code alone. This lab turns the account, note, proof, and privacy-policy lifecycle into an inspectable interface.
+Miden moves transaction execution and proof generation to the client. This lab turns the account, note, proof, and programmable-privacy lifecycle into an inspectable interface.
 
 ## Features
 
@@ -16,31 +16,57 @@ Miden moves transaction execution and proof generation to the client. That archi
 - Synced note summaries and consumable-note counts
 - Manual client synchronization
 - Visual explanation of local execution, proving, and submission
-- Programmable privacy design for private payments + policy checks
-- Selective disclosure scenarios for audit/review use cases
-- Responsive interface with accessible controls
+- Programmable Privacy UI simulator for private payments + policy checks
+- Protocol-level note PoC with target-account binding
+- Issuer-authenticated credential note using active-note sender metadata
+- Detached issuer-attestation payment scaffold that separates payer and policy authority
+- Executable deterministic PASS/FAIL fixture matrix in CI
+- Credential commitment that replaces sender-controlled boolean policy flags
+- Selective-disclosure scenarios for audit/review use cases
 
 ## Programmable privacy extension
 
-The lab now includes a design track focused on private payments with programmable policy conditions and scoped disclosure.
+The UI demonstrates private payment policy flows without claiming that UI state is protocol enforcement.
+
+The protocol PoC under `poc/policy-gated-note/` now contains two enforcement models.
+
+### Issuer-created credential note
+
+`policy-gated-note.masm` requires the note's sender to match the authorized issuer, binds consumption to the target account, and verifies a private credential commitment before assets move.
+
+### Detached issuer attestation
+
+`detached-attestation-payment.masm` separates payer and policy authority. The payer can fund the payment note while a distinct authority creates an attestation note. The payment note requires that exact attestation note in the same transaction and checks its sender and storage commitment using Miden input-note primitives before assets move.
+
+### PASS/FAIL fixtures
+
+`poc/policy-gated-note/fixtures/` contains an executable deterministic transaction-policy matrix covering:
+
+- valid detached attestation -> PASS
+- missing attestation -> `ERR_ATTESTATION_NOT_FOUND`
+- wrong issuer -> `ERR_ISSUER_ACCOUNT_MISMATCH`
+- wrong recipient -> `ERR_TARGET_ACCOUNT_MISMATCH`
+- wrong attestation commitment -> `ERR_ATTESTATION_COMMITMENT_MISMATCH`
+
+These fixtures run in the normal Node CI suite. They validate scenario semantics and expected failure mapping; they are not a substitute for executing the MASM inside Miden VM. A separate Miden 0.15 compile/VM fixture remains the next protocol-validation layer.
 
 Read:
 
 - [Programmable Privacy on Miden](docs/programmable-privacy.md)
 - [Privacy + Compliance Scenarios](docs/privacy-compliance-scenarios.md)
-
-The current policy examples are intentionally educational. UI simulations are not presented as protocol enforcement. The next implementation stage is to replace illustrative checks with real Miden-compatible note/account logic and deterministic tests.
+- [Credential Commitment Model](poc/policy-gated-note/CREDENTIAL_MODEL.md)
+- [Policy-gated Note PoC](poc/policy-gated-note/README.md)
 
 ## Live data vs. demo data
 
 The default screen uses representative values and labels them as demo data. Selecting **Connect testnet** initializes the official Miden Web SDK lazy entry. Only the connected screen displays SDK-derived account and note state.
 
-For the programmable-privacy track, the project distinguishes these categories explicitly:
+The project distinguishes these categories explicitly:
 
 - DEMO DATA
 - SDK-DERIVED DATA
 - LOCAL POLICY SIMULATION
-- ON-CHAIN / PROTOCOL-ENFORCED CONDITION
+- PROTOCOL-ENFORCED CONDITION
 
 ## Technology
 
@@ -48,6 +74,8 @@ For the programmable-privacy track, the project distinguishes these categories e
 - TypeScript
 - `@miden-sdk/react`
 - `@miden-sdk/miden-sdk`
+- Miden Assembly PoC note scripts
+- Node executable fixtures
 - vinext and Vite
 - Cloudflare-compatible deployment output
 
@@ -66,18 +94,38 @@ Production validation:
 npm test
 ```
 
+Run only the detached-attestation fixture matrix:
+
+```bash
+node poc/policy-gated-note/fixtures/run-fixtures.mjs
+```
+
 ## Project structure
 
 ```text
 app/
-├── MidenLab.tsx       # Interactive demo and connected SDK workspace
-├── globals.css        # Responsive visual system
-├── layout.tsx         # Metadata and application shell
-└── page.tsx           # Home route
+├── MidenLab.tsx
+├── ProgrammablePrivacy.tsx
+├── programmable-privacy.css
+├── globals.css
+├── layout.tsx
+└── page.tsx
 docs/
 ├── programmable-privacy.md
 └── privacy-compliance-scenarios.md
+poc/
+└── policy-gated-note/
+    ├── policy-gated-note.masm
+    ├── detached-attestation-payment.masm
+    ├── CREDENTIAL_MODEL.md
+    ├── README.md
+    └── fixtures/
+        ├── cases.json
+        └── run-fixtures.mjs
 tests/
+├── policy-gated-note.test.mjs
+├── detached-attestation-payment.test.mjs
+├── detached-attestation-fixtures.test.mjs
 └── rendered-html.test.mjs
 ```
 
@@ -88,21 +136,24 @@ tests/
 - [x] Add private wallet creation and note summaries
 - [x] Separate demo values from live SDK state
 - [x] Define programmable privacy architecture
-- [x] Define privacy + compliance scenario matrix
-- [ ] Add programmable privacy UI panel
+- [x] Add Programmable Privacy UI panel
+- [x] Add target-account recipient binding
+- [x] Replace boolean policy flags with a credential commitment
+- [x] Authenticate issuer by binding note sender metadata to the committed issuer account ID
+- [x] Add independent payer + issuer attestation scaffold
+- [x] Add executable deterministic PASS/FAIL transaction-policy fixtures
+- [ ] Compile and execute detached MASM with Miden 0.15 VM/client fixtures
+- [ ] Bind credential contents to asset, policy version, expiry, and nonce
 - [ ] Add testnet asset transfer form
 - [ ] Add note consumption flow
-- [ ] Implement a real scripted policy condition
 - [ ] Add selective disclosure proof prototype
-- [ ] Add transaction-stage timeline from live mutations
-- [ ] Add encrypted local export/import guidance
 - [ ] Extract a minimal contribution-ready tutorial
 
 ## Security
 
-This project is an educational testnet application. Do not use test interfaces with valuable assets or treat the code as audited production software.
+This project is an educational testnet application and protocol PoC. Do not use test interfaces with valuable assets or treat the code as audited production software.
 
-Policy checks implemented only in the UI are explanatory and must not be treated as enforceable compliance controls. Real enforcement must live in protocol-relevant programs and be covered by tests.
+The detached issuer-attestation flow separates payer and policy authority by requiring a distinct authority-created input note in the same transaction. The deterministic fixtures validate the intended policy outcomes, while full Miden VM execution is still required to confirm exact MASM stack behavior. Production compliance enforcement should additionally bind credential contents to asset, policy version, expiry, nonce, and revocation state.
 
 ## References
 

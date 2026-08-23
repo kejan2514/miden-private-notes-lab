@@ -1,0 +1,73 @@
+#! Issuer-authenticated credential-gated private payment note — Miden 0.15 PoC
+#!
+#! Storage layout (8 felts):
+#! [0] target account suffix
+#! [1] target account prefix
+#! [2] issuer account suffix
+#! [3] issuer account prefix
+#! [4..7] expected policy credential digest
+#!
+#! Inputs (note arguments): [POLICY_CREDENTIAL_PREIMAGE]
+#!
+#! The note can be consumed only when:
+#! 1. the note sender is the authorized issuer account,
+#! 2. the executing account matches the target account, and
+#! 3. the private credential preimage hashes to the committed digest.
+#!
+#! Security model: issuer authentication is inherited from Miden account
+#! authentication because the issuer must be the account that created the note.
+#! This PoC does not yet support a separate payer plus independent issuer
+#! signature in the same note; that requires a multi-party/attestation design.
+
+use miden::protocol::active_account
+use miden::protocol::account_id
+use miden::protocol::active_note
+use miden::standards::wallets::basic as basic_wallet
+
+const STORAGE_PTR=0
+const TARGET_ACCOUNT_ID_SUFFIX_PTR=STORAGE_PTR
+const TARGET_ACCOUNT_ID_PREFIX_PTR=STORAGE_PTR+1
+const ISSUER_ACCOUNT_ID_SUFFIX_PTR=STORAGE_PTR+2
+const ISSUER_ACCOUNT_ID_PREFIX_PTR=STORAGE_PTR+3
+const CREDENTIAL_DIGEST_PTR=STORAGE_PTR+4
+
+const ERR_UNEXPECTED_STORAGE_ITEMS="Issuer-authenticated credential note expects exactly 8 storage items"
+const ERR_ISSUER_ACCOUNT_MISMATCH="Credential note sender does not match authorized issuer account"
+const ERR_TARGET_ACCOUNT_MISMATCH="Credential-gated note target account does not match executing account"
+const ERR_CREDENTIAL_MISMATCH="Policy credential does not match committed credential"
+
+@note_script
+pub proc main
+    # Hash the private credential preimage supplied as note arguments.
+    hash
+    # => [COMPUTED_CREDENTIAL_DIGEST]
+
+    # Load target, issuer, and credential commitment into memory.
+    push.STORAGE_PTR exec.active_note::get_storage
+    eq.8 assert.err=ERR_UNEXPECTED_STORAGE_ITEMS
+    # => [COMPUTED_CREDENTIAL_DIGEST]
+
+    # Issuer authentication: the actual sender embedded in active-note metadata
+    # must match the issuer account ID committed in note storage.
+    mem_load.ISSUER_ACCOUNT_ID_PREFIX_PTR
+    mem_load.ISSUER_ACCOUNT_ID_SUFFIX_PTR
+    exec.active_note::get_sender
+    exec.account_id::eq assert.err=ERR_ISSUER_ACCOUNT_MISMATCH
+    # => [COMPUTED_CREDENTIAL_DIGEST]
+
+    # Recipient binding — same account-id comparison pattern used by P2ID.
+    mem_load.TARGET_ACCOUNT_ID_PREFIX_PTR
+    mem_load.TARGET_ACCOUNT_ID_SUFFIX_PTR
+    exec.active_account::get_id
+    exec.account_id::eq assert.err=ERR_TARGET_ACCOUNT_MISMATCH
+    # => [COMPUTED_CREDENTIAL_DIGEST]
+
+    # Verify possession of the private credential against the issuer-created
+    # commitment stored in the note.
+    padw push.CREDENTIAL_DIGEST_PTR mem_loadw_le
+    assert_eqw.err=ERR_CREDENTIAL_MISMATCH
+    # => []
+
+    # Assets move only after issuer, recipient, and credential checks all pass.
+    exec.basic_wallet::move_note_assets_to_account
+end
