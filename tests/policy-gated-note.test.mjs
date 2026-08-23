@@ -8,30 +8,33 @@ async function source() {
   return readFile(notePath, "utf8");
 }
 
-test("policy note binds consumption to the target account", async () => {
+test("credential note binds consumption to the target account", async () => {
   const masm = await source();
   assert.match(masm, /exec\.active_account::get_id/);
   assert.match(masm, /exec\.account_id::eq assert\.err=ERR_TARGET_ACCOUNT_MISMATCH/);
 });
 
-test("policy note requires all three policy gates", async () => {
+test("credential note verifies a committed credential hash", async () => {
   const masm = await source();
-  assert.match(masm, /RECIPIENT_ALLOWED_PTR eq\.1 assert\.err=ERR_RECIPIENT_POLICY/);
-  assert.match(masm, /ASSET_ALLOWED_PTR eq\.1 assert\.err=ERR_ASSET_POLICY/);
-  assert.match(masm, /JURISDICTION_ALLOWED_PTR eq\.1 assert\.err=ERR_JURISDICTION_POLICY/);
+  assert.match(masm, /hash/);
+  assert.match(masm, /CREDENTIAL_DIGEST_PTR/);
+  assert.match(masm, /mem_loadw_le/);
+  assert.match(masm, /assert_eqw\.err=ERR_CREDENTIAL_MISMATCH/);
 });
 
-test("assets move only after recipient and policy checks", async () => {
+test("boolean policy flags are removed", async () => {
+  const masm = await source();
+  assert.doesNotMatch(masm, /RECIPIENT_ALLOWED_PTR|ASSET_ALLOWED_PTR|JURISDICTION_ALLOWED_PTR/);
+  assert.doesNotMatch(masm, /ERR_RECIPIENT_POLICY|ERR_ASSET_POLICY|ERR_JURISDICTION_POLICY/);
+});
+
+test("assets move only after recipient and credential checks", async () => {
   const masm = await source();
   const recipientCheck = masm.indexOf("exec.account_id::eq");
-  const recipientPolicy = masm.indexOf("ERR_RECIPIENT_POLICY");
-  const assetPolicy = masm.indexOf("ERR_ASSET_POLICY");
-  const jurisdictionPolicy = masm.indexOf("ERR_JURISDICTION_POLICY");
+  const credentialCheck = masm.indexOf("assert_eqw.err=ERR_CREDENTIAL_MISMATCH");
   const moveAssets = masm.indexOf("exec.basic_wallet::move_note_assets_to_account");
 
   assert.ok(recipientCheck >= 0);
-  assert.ok(moveAssets > recipientCheck);
-  assert.ok(moveAssets > recipientPolicy);
-  assert.ok(moveAssets > assetPolicy);
-  assert.ok(moveAssets > jurisdictionPolicy);
+  assert.ok(credentialCheck > recipientCheck);
+  assert.ok(moveAssets > credentialCheck);
 });
