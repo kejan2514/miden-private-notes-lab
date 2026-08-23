@@ -24,6 +24,8 @@ test("server-renders the Miden lab", async () => {
   assert.match(html, /PRIVATE NOTES LAB/);
   assert.match(html, /Representative data · no network claims/);
   assert.match(html, /Connect to testnet/);
+  assert.match(html, /PROGRAMMABLE PRIVACY/);
+  assert.match(html, /Private payment policy simulator/);
   assert.match(html, /Built with the official Miden Web SDK/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
 });
@@ -41,4 +43,16 @@ test("keeps live SDK data separate from demo data", async () => {
   assert.match(shellSource, /ssr: false/);
   assert.match(packageJson, /"@miden-sdk\/react"/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
+});
+
+test("labels programmable privacy as a simulator and exposes policy controls", async () => {
+  const source = await readFile(new URL("../app/ProgrammablePrivacy.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /Educational PoC · simulated policy layer/);
+  assert.match(source, /Recipient allowlist/);
+  assert.match(source, /Asset policy/);
+  assert.match(source, /Jurisdiction policy/);
+  assert.match(source, /Create selective disclosure/);
+  assert.match(source, /UI-level policy simulator/);
+  assert.match(source, /does not claim that these checks are currently enforced on testnet/);
 });
