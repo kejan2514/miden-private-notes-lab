@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
+import { ProgrammablePrivacy } from "./ProgrammablePrivacy";
 
 type LabMode = "demo" | "testnet";
 
@@ -77,6 +78,8 @@ function DemoWorkspace({ onConnect }: { onConnect: () => void }) {
           <div className="proof-note"><span>◈</span><p>Execution data stays on the client. The dashboard labels every simulated value to avoid presenting demo data as network state.</p></div>
         </aside>
       </div>
+
+      <ProgrammablePrivacy />
     </WorkspaceFrame>
   );
 }
