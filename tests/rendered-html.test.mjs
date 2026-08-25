@@ -25,7 +25,7 @@ test("server-renders the Miden lab", async () => {
   assert.match(html, /Representative data · no network claims/);
   assert.match(html, /Connect to testnet/);
   assert.match(html, /PROGRAMMABLE PRIVACY/);
-  assert.match(html, /Private payment policy simulator/);
+  assert.match(html, /Private stablecoin risk-control simulator/);
   assert.match(html, /Built with the official Miden Web SDK/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
 });
@@ -45,14 +45,14 @@ test("keeps live SDK data separate from demo data", async () => {
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 });
 
-test("labels programmable privacy as a simulator and exposes policy controls", async () => {
+test("labels programmable privacy as a simulator and exposes stablecoin risk controls", async () => {
   const source = await readFile(new URL("../app/ProgrammablePrivacy.tsx", import.meta.url), "utf8");
 
   assert.match(source, /Educational PoC · simulated policy layer/);
-  assert.match(source, /Recipient allowlist/);
+  assert.match(source, /Recipient freeze list/);
   assert.match(source, /Asset policy/);
   assert.match(source, /Jurisdiction policy/);
-  assert.match(source, /Create selective disclosure/);
-  assert.match(source, /UI-level policy simulator/);
-  assert.match(source, /does not claim that these checks are currently enforced on testnet/);
+  assert.match(source, /Create risk-manager disclosure/);
+  assert.match(source, /UI-level architecture simulator/);
+  assert.match(source, /does not claim that stablecoin freeze lists, risk-manager disclosure, or jurisdiction checks are currently enforced on Miden testnet/);
 });
