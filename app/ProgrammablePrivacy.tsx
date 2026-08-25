@@ -4,13 +4,13 @@ import { useMemo, useState } from "react";
 import styles from "./ProgrammablePrivacy.module.css";
 
 type PolicyState = {
-  recipientAllowed: boolean;
+  recipientFrozen: boolean;
   assetAllowed: boolean;
   jurisdictionAllowed: boolean;
 };
 
 const initialPolicy: PolicyState = {
-  recipientAllowed: true,
+  recipientFrozen: false,
   assetAllowed: true,
   jurisdictionAllowed: true,
 };
@@ -21,7 +21,7 @@ export function ProgrammablePrivacy() {
   const [disclosed, setDisclosed] = useState(false);
 
   const approved = useMemo(
-    () => policy.recipientAllowed && policy.assetAllowed && policy.jurisdictionAllowed,
+    () => !policy.recipientFrozen && policy.assetAllowed && policy.jurisdictionAllowed,
     [policy],
   );
 
@@ -35,12 +35,12 @@ export function ProgrammablePrivacy() {
       <div className={styles.heading}>
         <div>
           <span>PROGRAMMABLE PRIVACY</span>
-          <h3 id="programmable-privacy-title">Private payment policy simulator</h3>
+          <h3 id="programmable-privacy-title">Private stablecoin risk-control simulator</h3>
         </div>
         <small>Educational PoC · simulated policy layer</small>
       </div>
 
-      <div className={styles.flow} aria-label="Private payment flow">
+      <div className={styles.flow} aria-label="Private stablecoin payment flow">
         <article>
           <span>01</span>
           <strong>Alice</strong>
@@ -80,14 +80,18 @@ export function ProgrammablePrivacy() {
 
           <div className={styles.rules}>
             <Rule
-              label="Recipient allowlist"
-              detail="Bob is eligible to receive the private note"
-              enabled={policy.recipientAllowed}
-              onToggle={() => toggle("recipientAllowed")}
+              label="Recipient freeze list"
+              detail={
+                policy.recipientFrozen
+                  ? "Bob is frozen and the private note must not be consumable"
+                  : "Bob is not present on the simulated freeze list"
+              }
+              enabled={!policy.recipientFrozen}
+              onToggle={() => toggle("recipientFrozen")}
             />
             <Rule
               label="Asset policy"
-              detail="USDC is permitted by the simulated policy"
+              detail="USDC is permitted by the simulated issuer policy"
               enabled={policy.assetAllowed}
               onToggle={() => toggle("assetAllowed")}
             />
@@ -105,20 +109,21 @@ export function ProgrammablePrivacy() {
           <strong>{approved ? "PASS" : "FAIL"}</strong>
           <p>
             {approved
-              ? "All simulated policy checks pass. A real Miden implementation would enforce equivalent conditions in programmable note/account logic before consumption."
-              : "At least one simulated rule fails, so this demo treats the private transfer as non-consumable."}
+              ? "All simulated controls pass. A real Miden implementation could encode equivalent checks in programmable note or account logic before the private asset can move."
+              : "At least one simulated control fails, so this demo treats the private stablecoin transfer as non-consumable."}
           </p>
           <button disabled={!approved} onClick={() => setDisclosed((value) => !value)}>
-            {disclosed ? "Hide disclosure" : "Create selective disclosure"}
+            {disclosed ? "Hide risk-manager view" : "Create risk-manager disclosure"}
           </button>
           {disclosed && approved ? (
             <div className={styles.disclosure}>
-              <span>DISCLOSED TO AUDITOR</span>
+              <span>DISCLOSED TO RISK MANAGER</span>
               <dl>
                 <div><dt>Policy</dt><dd>Passed</dd></div>
                 <div><dt>Asset</dt><dd>USDC</dd></div>
                 <div><dt>Amount</dt><dd>{amount || "0"}</dd></div>
-                <div><dt>Counterparties</dt><dd>Hidden</dd></div>
+                <div><dt>Sender / recipient</dt><dd>Hidden</dd></div>
+                <div><dt>Freeze-list status</dt><dd>Clear</dd></div>
               </dl>
             </div>
           ) : null}
@@ -126,7 +131,7 @@ export function ProgrammablePrivacy() {
       </div>
 
       <p className={styles.disclaimer}>
-        This panel is a UI-level policy simulator. It does not claim that these checks are currently enforced on testnet. The goal is to make the intended programmable-privacy architecture inspectable before wiring it to Miden note scripts or account components.
+        This panel is a UI-level architecture simulator. It does not claim that stablecoin freeze lists, risk-manager disclosure, or jurisdiction checks are currently enforced on Miden testnet. The goal is to model how private transfers and explicit risk controls could coexist before wiring the design to Miden note scripts or account components.
       </p>
     </section>
   );
