@@ -1,6 +1,6 @@
 # Private stablecoin risk controls on Miden
 
-> Design note for an educational proof of concept. The current UI is a simulator; this document describes a path toward enforcing equivalent rules with Miden primitives. It does not claim that the simulated controls are currently enforced on Miden testnet.
+> Design note for an educational proof of concept. The browser UI is a simulator; the repository also contains a deterministic Miden Assembly note-policy scaffold. Neither should be treated as an audited stablecoin or compliance system.
 
 ## Goal
 
@@ -9,83 +9,101 @@ Model a private stablecoin payment in which transaction details remain private t
 The prototype focuses on three ideas:
 
 1. **Private transfer** — value moves through a private Miden note rather than exposing the full payment payload publicly.
-2. **Programmable risk controls** — note/account logic decides whether the payment may be consumed.
-3. **Selective disclosure** — compliance evidence can be prepared for an authorized auditor without making the full transaction public.
+2. **Programmable risk controls** — note logic gates consumption before assets are added to the consuming account.
+3. **Selective disclosure** — the UI demonstrates a deliberately scoped risk-manager view without exposing the full transaction.
 
 ## Actors
 
 - **Alice** — sender.
 - **Bob** — intended recipient.
-- **Issuer / policy authority** — defines stablecoin policy inputs.
+- **Issuer / policy authority** — defines stablecoin policy state in a future authenticated design.
 - **Risk manager** — authorized party that may receive narrowly scoped disclosure.
 - **Public observer** — should not receive the private payment details.
 
-## Policy model
+## Current deterministic note model
 
-The UI currently represents three policy checks:
+The Phase 2 MASM scaffold is [`masm/notes/private_stablecoin_policy.masm`](../masm/notes/private_stablecoin_policy.masm).
 
-| Rule | Purpose | Intended enforcement point |
+It reads one policy word from note storage:
+
+```text
+[recipient_allowed, asset_allowed, jurisdiction_allowed, policy_active]
+```
+
+Each field must equal `1`. The script checks the values before calling `wallet::add_assets_to_account`.
+
+| Rule | Failure | Current representation |
 | --- | --- | --- |
-| Recipient freeze list | Reject a frozen or blocked recipient | Note script and/or controlled account component |
-| Asset policy | Restrict the flow to an approved stablecoin asset | Note script |
-| Jurisdiction policy | Require an approved policy state for the transfer route | Note inputs plus note/account logic |
+| Recipient freeze list | `ERROR_RECIPIENT_FROZEN` | deterministic `recipient_allowed` fixture bit |
+| Asset policy | `ERROR_ASSET_BLOCKED` | deterministic `asset_allowed` fixture bit |
+| Jurisdiction policy | `ERROR_JURISDICTION_BLOCKED` | deterministic `jurisdiction_allowed` fixture bit |
+| Policy lifecycle | `ERROR_POLICY_INACTIVE` | deterministic `policy_active` fixture bit |
 
-A payment is consumable only when every required policy predicate evaluates to true.
+This proves the enforcement location and failure ordering. It does **not** yet authenticate who supplied the policy bits or prove that an asset-policy bit corresponds to a specific issuer asset.
 
-## Proposed note flow
+## Deterministic test vectors
+
+[`tests/fixtures/private-stablecoin-policy.json`](../tests/fixtures/private-stablecoin-policy.json) defines:
+
+- one successful policy word;
+- frozen-recipient failure;
+- asset-policy failure;
+- jurisdiction-policy failure;
+- inactive-policy failure.
+
+[`tests/private-stablecoin-policy.test.mjs`](../tests/private-stablecoin-policy.test.mjs) checks those vectors and verifies that the MASM source keeps every policy assertion before asset transfer.
+
+## Note flow
 
 ```text
 Alice
   |
-  | create private stablecoin note
+  | creates private stablecoin note
   v
 [ private note ]
-  |  asset commitment
-  |  amount / recipient data kept private as appropriate
-  |  policy inputs / commitments
+  | policy word in note storage (Phase 2 fixture)
   v
 Bob attempts consumption
   |
-  +--> verify recipient policy
-  +--> verify asset policy
-  +--> verify jurisdiction/policy state
+  +--> policy active?
+  +--> jurisdiction allowed?
+  +--> asset policy allowed?
+  +--> recipient allowed?
   |
-  +--> PASS -> consume note and produce the next state/output note
+  +--> PASS -> add note assets to consuming account
   |
-  +--> FAIL -> note cannot be consumed through the intended path
+  +--> FAIL -> assertion stops the intended consumption path
 ```
 
-The exact representation of policy state should be chosen from current Miden account, note, and authentication primitives rather than inventing a separate trust layer.
+## Freeze-list design beyond the fixture
 
-## Freeze-list design
+The current toggle and note bit are not a production freeze-list system. A stronger design needs authenticated, fresh policy state.
 
-The UI toggle is only a simulation. A real implementation needs a verifiable policy input.
+A practical next direction is:
 
-A practical design direction is:
-
-1. The policy authority maintains a commitment to the current allow/freeze state.
-2. The consumer supplies the witness required by the note/account logic.
-3. The program verifies that the intended recipient satisfies the committed policy.
-4. If the recipient is frozen, the transaction cannot satisfy the consumption conditions.
-
-The PoC should prefer a small deterministic policy fixture first. Dynamic policy updates and issuer governance can be added only after the basic note path is tested.
+1. a policy authority commits to the current allow/freeze state;
+2. the transaction supplies the witness required by note/account logic;
+3. the program verifies recipient eligibility against the authenticated commitment;
+4. stale or revoked policy state is rejected;
+5. the authority and update mechanism are explicit and auditable.
 
 ## Selective disclosure
 
 Selective disclosure must not be confused with making a private note public.
 
-For this PoC, the intended disclosure record contains only what the policy requires, for example:
+For this PoC, the browser preview reveals only a minimal review record such as:
 
 ```text
 policy_result = PASS
 asset = USDC
 amount = 100
 counterparties = HIDDEN
+freeze_list_status = CLEAR
 ```
 
-A production design would need explicit authorization and cryptographic binding between the disclosure and the underlying transaction/note. The browser UI currently demonstrates the disclosure boundary only; it does not yet generate such a proof or encrypted auditor payload.
+This is only a UX boundary today. A production design would need explicit authorization plus cryptographic binding between the disclosed statement and the underlying note/transaction commitment.
 
-## Implementation plan
+## Implementation status
 
 ### Phase 1 — architecture simulator
 
@@ -98,45 +116,40 @@ A production design would need explicit authorization and cryptographic binding 
 
 ### Phase 2 — deterministic Miden note prototype
 
-- [ ] Create a minimal custom note script for the stablecoin-policy path.
-- [ ] Encode a deterministic recipient policy fixture.
-- [ ] Reject consumption when the recipient policy fails.
-- [ ] Verify the expected asset before consumption.
-- [ ] Add unit/integration tests for allowed and blocked transfers.
+- [x] Create a minimal custom note script for the stablecoin-policy path.
+- [x] Encode deterministic policy fixtures.
+- [x] Reject consumption when recipient policy fails.
+- [x] Reject consumption when the asset-policy predicate fails.
+- [x] Reject consumption when jurisdiction policy fails.
+- [x] Reject consumption when policy is inactive.
+- [x] Add allow/deny test vectors and source-order enforcement tests.
 
-### Phase 3 — client integration
+### Phase 3 — executable Miden client integration
 
-- [ ] Create the custom note through the official Miden client/Web SDK where supported.
-- [ ] Execute/prove the transaction locally.
-- [ ] Surface real note/transaction state separately from simulated policy examples.
+- [ ] Create the custom note through the current Miden client/toolchain.
+- [ ] Execute/prove successful consumption locally.
+- [ ] Execute negative fixtures and confirm assertion failures in the Miden VM/client.
+- [ ] Bind the policy note to the intended recipient/account.
 - [ ] Keep private values out of logs and analytics.
 
-### Phase 4 — selective disclosure experiment
+### Phase 4 — authenticated policy + selective disclosure
 
-- [ ] Define the minimum auditor disclosure schema.
-- [ ] Bind the disclosure to the relevant note/transaction commitment.
-- [ ] Add an explicit auditor authorization mechanism.
-- [ ] Document what the auditor can and cannot learn.
-
-## Tests we should require
-
-At minimum, the executable prototype should cover:
-
-1. approved recipient + approved asset + approved jurisdiction -> success;
-2. frozen recipient -> failure;
-3. unapproved asset -> failure;
-4. disallowed jurisdiction/policy state -> failure;
-5. changing a disclosed field invalidates its binding to the original transaction;
-6. normal public observers do not receive the private fields used by the policy logic.
+- [ ] Replace fixture bits with issuer-authenticated policy state.
+- [ ] Define the minimum risk-manager disclosure schema.
+- [ ] Bind disclosure to the relevant note/transaction commitment.
+- [ ] Add explicit auditor authorization and revocation.
+- [ ] Document exactly what the auditor can and cannot learn.
 
 ## Security and scope notes
 
 - This repository is an independent educational project, not a stablecoin product or compliance system.
-- A UI toggle is not a security control. Enforcement belongs in verifiable Miden program logic.
+- A UI toggle is not a security control.
+- The deterministic MASM policy bits are an enforcement scaffold, not authenticated policy state.
+- A production asset check must verify the actual asset/issuer relationship rather than trust an `asset_allowed` bit.
 - The risk manager must not receive a universal view key by accident; disclosure should be deliberately scoped.
-- Freeze-list freshness, issuer key management, revocation, recovery, and policy governance are production concerns and are intentionally outside the first PoC.
+- Freeze-list freshness, issuer key management, revocation, recovery, and policy governance are production concerns.
 - No private keys, secrets, or personally identifying compliance data should be committed to the repository.
 
 ## Why this is useful
 
-The experiment demonstrates the architectural distinction between **privacy from public observers** and **controlled disclosure to an authorized party**. Miden's programmable notes, private state, and client-side execution/proving make that distinction worth testing as executable code rather than treating privacy and policy as purely application-layer UI concepts.
+The experiment demonstrates the architectural distinction between **privacy from public observers** and **controlled disclosure to an authorized party**. The deterministic note script makes the policy gate concrete while keeping the current trust limitations visible instead of presenting UI simulation as protocol enforcement.
