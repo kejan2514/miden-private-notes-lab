@@ -1,63 +1,60 @@
 # Privacy + Compliance Scenarios
 
-This file defines concrete test cases for the programmable-privacy extension.
+This file defines concrete test cases for the private-stablecoin programmable-privacy extension.
 
-## Policy matrix
+## Deterministic Phase 2 policy matrix
 
-| Scenario | Sender approved | Receiver approved | Asset allowed | Jurisdiction allowed | Expected result |
+The current MASM scaffold stores one policy word as:
+
+```text
+[recipient_allowed, asset_allowed, jurisdiction_allowed, policy_active]
+```
+
+| Scenario | Recipient allowed | Asset allowed | Jurisdiction allowed | Policy active | Expected result |
 | --- | --- | --- | --- | --- | --- |
 | Happy path | yes | yes | yes | yes | allow |
-| Blocked sender | no | yes | yes | yes | deny |
-| Blocked receiver | yes | no | yes | yes | deny |
-| Unsupported asset | yes | yes | no | yes | deny |
-| Jurisdiction rule fails | yes | yes | yes | no | deny |
-| Zero amount | yes | yes | yes | yes | deny |
+| Frozen recipient | no | yes | yes | yes | `ERROR_RECIPIENT_FROZEN` |
+| Unsupported asset policy | yes | no | yes | yes | `ERROR_ASSET_BLOCKED` |
+| Jurisdiction rule fails | yes | yes | no | yes | `ERROR_JURISDICTION_BLOCKED` |
+| Policy inactive | yes | yes | yes | no | `ERROR_POLICY_INACTIVE` |
+
+These cases are encoded in `tests/fixtures/private-stablecoin-policy.json` and checked by `tests/private-stablecoin-policy.test.mjs`.
 
 ## Selective disclosure cases
 
-### Reviewer needs amount-band confirmation
+### Risk manager needs payment review
 
-Reveal:
-- `amount <= threshold`
-- policy version
-- verification result
+The UI preview may reveal:
 
-Keep private:
-- exact amount
-- sender
-- receiver
-- payment reference
+- policy passed;
+- asset label used by the simulator;
+- transfer amount used by the simulator;
+- freeze-list status.
 
-### Reviewer needs asset-policy confirmation
+It keeps sender and recipient identities hidden in the preview.
 
-Reveal:
-- asset policy passed
-- policy version
-- verification result
-
-Keep private:
-- counterparty metadata
-- transfer amount unless separately required
+This is **not** yet a cryptographic disclosure proof. A real implementation must bind the disclosure to a note or transaction commitment and authenticate the reviewer.
 
 ### User declines disclosure
 
 Expected behavior:
+
 - transaction privacy remains unchanged;
 - UI explains that disclosure is optional in the educational model;
-- no fake proof or reviewer result is displayed.
+- no fake proof or reviewer verification result is displayed.
 
-## UI requirements
+## Data labels
 
-Every scenario screen should clearly identify one of these states:
+The interface and documentation should distinguish these states:
 
 ```text
 DEMO DATA
 SDK-DERIVED DATA
 LOCAL POLICY SIMULATION
-ON-CHAIN / PROTOCOL-ENFORCED CONDITION
+MASM POLICY SCAFFOLD
 ```
 
-The interface must never blur those categories.
+The interface must never present simulated policy state as live network enforcement.
 
 ## Non-goals
 
@@ -67,16 +64,20 @@ This project does not claim to provide:
 - sanctions screening;
 - legal jurisdiction determination;
 - an audited stablecoin contract;
+- authenticated live freeze-list infrastructure;
+- cryptographically bound auditor disclosure today;
 - guaranteed confidentiality against browser, endpoint, or operational leakage.
 
 ## Contribution checklist
 
 Before extracting this work into an upstream tutorial:
 
-- [ ] Replace illustrative policy logic with actual Miden-compatible logic.
-- [ ] Add deterministic test vectors.
-- [ ] Add failure-path tests.
-- [ ] Document all public and private fields.
-- [ ] Explain trusted roles and key ownership.
-- [ ] Remove claims that cannot be demonstrated in code.
-- [ ] Verify SDK APIs against the current Miden release.
+- [x] Add a Miden-compatible deterministic note-policy scaffold.
+- [x] Add deterministic test vectors.
+- [x] Add failure-path tests.
+- [x] Document public/private and simulated/enforced boundaries.
+- [x] Explain current trusted-role limitations.
+- [x] Remove claims that cannot be demonstrated in code.
+- [ ] Execute the custom note through the current Miden client/toolchain.
+- [ ] Replace fixture bits with issuer-authenticated policy state.
+- [ ] Add cryptographically bound selective disclosure.

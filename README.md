@@ -16,20 +16,30 @@ Miden moves transaction execution and proof generation to the client. That archi
 - Synced note summaries and consumable-note counts
 - Manual client synchronization
 - Visual explanation of local execution, proving, and submission
-- Programmable privacy design for private payments + policy checks
-- Selective disclosure scenarios for audit/review use cases
+- Private stablecoin risk-control simulator
+- Deterministic Miden Assembly note-policy prototype
+- Freeze-list, asset-policy, jurisdiction, and policy-active test vectors
+- Scoped risk-manager disclosure preview
 - Responsive interface with accessible controls
 
-## Programmable privacy extension
+## Private stablecoin risk-control PoC
 
-The lab now includes a design track focused on private payments with programmable policy conditions and scoped disclosure.
+The current branch models a private stablecoin payment where a note may be consumed only when four deterministic policy predicates pass:
+
+1. recipient is not frozen;
+2. the asset-policy predicate passes;
+3. the jurisdiction-policy predicate passes;
+4. the policy is active.
+
+The browser panel is explicitly a simulator. The protocol-facing experiment lives in [`masm/notes/private_stablecoin_policy.masm`](masm/notes/private_stablecoin_policy.masm), and its deterministic positive/negative vectors live in [`tests/fixtures/private-stablecoin-policy.json`](tests/fixtures/private-stablecoin-policy.json).
 
 Read:
 
+- [Private Stablecoin Risk Controls](docs/private-stablecoin-risk-controls.md)
 - [Programmable Privacy on Miden](docs/programmable-privacy.md)
 - [Privacy + Compliance Scenarios](docs/privacy-compliance-scenarios.md)
 
-The current policy examples are intentionally educational. UI simulations are not presented as protocol enforcement. The next implementation stage is to replace illustrative checks with real Miden-compatible note/account logic and deterministic tests.
+The MASM policy script is a deterministic enforcement scaffold, not a production compliance mechanism. The policy bits are fixtures stored in the note; dynamic issuer-authenticated policy commitments, live freeze-list freshness, and cryptographically bound selective disclosure remain separate follow-on work.
 
 ## Live data vs. demo data
 
@@ -40,7 +50,7 @@ For the programmable-privacy track, the project distinguishes these categories e
 - DEMO DATA
 - SDK-DERIVED DATA
 - LOCAL POLICY SIMULATION
-- ON-CHAIN / PROTOCOL-ENFORCED CONDITION
+- MASM POLICY SCAFFOLD
 
 ## Technology
 
@@ -48,6 +58,8 @@ For the programmable-privacy track, the project distinguishes these categories e
 - TypeScript
 - `@miden-sdk/react`
 - `@miden-sdk/miden-sdk`
+- Miden Assembly note scripts
+- Node.js test runner
 - vinext and Vite
 - Cloudflare-compatible deployment output
 
@@ -60,7 +72,7 @@ npm install
 npm run dev
 ```
 
-Production validation:
+Production validation builds the app and runs all render/policy tests:
 
 ```bash
 npm test
@@ -70,14 +82,19 @@ npm test
 
 ```text
 app/
-├── MidenLab.tsx       # Interactive demo and connected SDK workspace
-├── globals.css        # Responsive visual system
-├── layout.tsx         # Metadata and application shell
-└── page.tsx           # Home route
+├── MidenLab.tsx                    # Interactive demo and connected SDK workspace
+├── MidenLiveWorkspace.tsx          # Official Miden React SDK testnet surface
+├── ProgrammablePrivacy.tsx         # Stablecoin risk-control simulator
+└── ProgrammablePrivacy.module.css
 docs/
+├── private-stablecoin-risk-controls.md
 ├── programmable-privacy.md
 └── privacy-compliance-scenarios.md
+masm/notes/
+└── private_stablecoin_policy.masm  # Deterministic policy-gated note script
 tests/
+├── fixtures/private-stablecoin-policy.json
+├── private-stablecoin-policy.test.mjs
 └── rendered-html.test.mjs
 ```
 
@@ -89,24 +106,26 @@ tests/
 - [x] Separate demo values from live SDK state
 - [x] Define programmable privacy architecture
 - [x] Define privacy + compliance scenario matrix
-- [ ] Add programmable privacy UI panel
-- [ ] Add testnet asset transfer form
-- [ ] Add note consumption flow
-- [ ] Implement a real scripted policy condition
-- [ ] Add selective disclosure proof prototype
+- [x] Add programmable privacy UI panel
+- [x] Add deterministic Miden Assembly policy note scaffold
+- [x] Add deterministic allow/deny policy vectors
+- [x] Add failure-path tests for recipient, asset, jurisdiction, and policy-active gates
+- [ ] Create and consume this custom policy note through a real Miden client transaction fixture
+- [ ] Replace fixture policy bits with issuer-authenticated policy commitments
+- [ ] Bind selective disclosure cryptographically to a note/transaction commitment
 - [ ] Add transaction-stage timeline from live mutations
-- [ ] Add encrypted local export/import guidance
-- [ ] Extract a minimal contribution-ready tutorial
+- [ ] Extract a minimal contribution-ready tutorial after executable client integration
 
 ## Security
 
 This project is an educational testnet application. Do not use test interfaces with valuable assets or treat the code as audited production software.
 
-Policy checks implemented only in the UI are explanatory and must not be treated as enforceable compliance controls. Real enforcement must live in protocol-relevant programs and be covered by tests.
+The UI checks are explanatory. The MASM note script demonstrates where deterministic enforcement can live, but its current policy bits are supplied as note-storage fixtures. A production design would need authenticated policy state, clear issuer authority, freshness/revocation rules, recipient binding, and executable integration tests against the current Miden client/toolchain.
 
 ## References
 
 - [Miden documentation](https://docs.miden.xyz/)
+- [Miden custom note tutorial](https://github.com/0xMiden/tutorials/blob/main/docs/src/rust-client/custom_note_how_to.md)
 - [Miden Web SDK](https://github.com/0xMiden/web-sdk)
 - [Miden GitHub organization](https://github.com/0xMiden)
 

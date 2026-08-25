@@ -1,0 +1,44 @@
+use miden::protocol::active_note
+use miden::standards::wallets::basic->wallet
+
+# CONSTANTS
+# =================================================================================================
+
+const POLICY_PTR=0
+
+# ERRORS
+# =================================================================================================
+
+const ERROR_POLICY_INACTIVE="Stablecoin policy is inactive"
+const ERROR_JURISDICTION_BLOCKED="Jurisdiction policy rejected the transfer"
+const ERROR_ASSET_BLOCKED="Asset policy rejected the transfer"
+const ERROR_RECIPIENT_FROZEN="Recipient is blocked by the policy fixture"
+
+#! Inputs (arguments): []
+#! Outputs: []
+#!
+#! Prototype note storage layout (one word):
+#!   [recipient_allowed, asset_allowed, jurisdiction_allowed, policy_active]
+#!
+#! Each value must be exactly 1 for the note to be consumable.
+#! This is intentionally a deterministic fixture for Phase 2. It proves that the
+#! policy gate can live in note logic before we introduce authenticated dynamic
+#! policy commitments, issuer governance, or selective-disclosure proofs.
+@note_script
+pub proc main
+    # Write note storage to memory. The storage word is loaded below in little-endian
+    # stack order; each `assert` consumes the current top element.
+    push.POLICY_PTR exec.active_note::get_storage drop
+
+    padw push.POLICY_PTR mem_loadw_le
+
+    # The four fixture predicates must all evaluate to 1.
+    # Keep each failure distinct so integration tests can identify the rejected rule.
+    assert.err=ERROR_POLICY_INACTIVE
+    assert.err=ERROR_JURISDICTION_BLOCKED
+    assert.err=ERROR_ASSET_BLOCKED
+    assert.err=ERROR_RECIPIENT_FROZEN
+
+    # Policy passed: allow the consuming account to receive every asset in the note.
+    exec.wallet::add_assets_to_account
+end
