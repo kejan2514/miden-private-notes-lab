@@ -1,0 +1,27 @@
+[
+  {
+    "name": "happy path",
+    "storage": [1, 1, 1, 1],
+    "expected": "allow"
+  },
+  {
+    "name": "recipient frozen",
+    "storage": [0, 1, 1, 1],
+    "expected": "ERROR_RECIPIENT_FROZEN"
+  },
+  {
+    "name": "asset blocked",
+    "storage": [1, 0, 1, 1],
+    "expected": "ERROR_ASSET_BLOCKED"
+  },
+  {
+    "name": "jurisdiction blocked",
+    "storage": [1, 1, 0, 1],
+    "expected": "ERROR_JURISDICTION_BLOCKED"
+  },
+  {
+    "name": "policy inactive",
+    "storage": [1, 1, 1, 0],
+    "expected": "ERROR_POLICY_INACTIVE"
+  }
+]
