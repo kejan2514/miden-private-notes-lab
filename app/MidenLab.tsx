@@ -20,7 +20,7 @@ const demoNotes = [
 const proofSteps = [
   ["01", "Execute locally", "Account and note state transition"],
   ["02", "Generate proof", "Client-side STARK proof"],
-  ["03", "Submit transaction", "Only commitments reach the network"],
+  ["03", "Submit transaction", "Proof and encrypted inputs reach validators"],
 ];
 
 function Logo() {
@@ -75,7 +75,7 @@ function DemoWorkspace({ onConnect }: { onConnect: () => void }) {
               </div>
             ))}
           </div>
-          <div className="proof-note"><span>◈</span><p>Execution data stays on the client. The dashboard labels every simulated value to avoid presenting demo data as network state.</p></div>
+          <div className="proof-note"><span>◈</span><p>Private inputs are encrypted in transit. In the current privacy stage, validators can decrypt and re-execute them. All values shown in demo mode are simulated.</p></div>
         </aside>
       </div>
 
@@ -98,7 +98,7 @@ function WorkspaceFrame({ mode, onConnect, children }: { mode: LabMode; onConnec
         <div className="hero-art" aria-hidden="true"><div className="proof-disc"><span>M</span><i /><i /><i /></div><div className="commitment commitment-one">ACCOUNT<br/><b>LOCAL</b></div><div className="commitment commitment-two">PROOF<br/><b>CLIENT</b></div><div className="commitment commitment-three">CHAIN<br/><b>COMMIT</b></div></div>
       </section>
 
-      <section id="workspace" className="workspace"><div className="section-title"><div><span>DEVELOPER WORKSPACE</span><h2>{mode === "demo" ? "Private transaction lab" : "Connected testnet client"}</h2></div><p>{mode === "demo" ? "Representative data · no network claims" : "Official Miden SDK · browser-local state"}</p></div>{children}</section>
+      <section id="workspace" className="workspace"><div className="section-title"><div><span>DEVELOPER WORKSPACE</span><h2>{mode === "demo" ? "Private transaction lab" : "Testnet client workspace"}</h2></div><p>{mode === "demo" ? "Representative data · no network claims" : "Official Miden SDK · browser-local state"}</p></div>{children}</section>
 
       <section id="learn" className="learn-section"><span>WHY MIDEN</span><h2>Private state. Local execution. Verifiable outcomes.</h2><div className="learn-grid"><article><b>01</b><h3>Accounts</h3><p>Store application state publicly or privately while preserving programmable behavior.</p></article><article><b>02</b><h3>Notes</h3><p>Move assets and data through composable objects that can remain private to participants.</p></article><article><b>03</b><h3>Proofs</h3><p>Execute transactions and create proofs on the client before submitting commitments.</p></article></div></section>
       <footer><Logo /><p>Independent educational project. Not affiliated with or endorsed by Miden.</p><span>Built with the official Miden Web SDK</span></footer>

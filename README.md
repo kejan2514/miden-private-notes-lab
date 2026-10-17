@@ -13,6 +13,8 @@ Miden moves transaction execution and proof generation to the client. That archi
 - Clearly labeled demo workspace with representative note data
 - Optional connection to Miden testnet through the official React SDK
 - Browser-local private wallet creation
+- Standard private P2ID send, Note Transport Service delivery, consume and balance verification
+- Actual execution-fee display and a separate v0.17 browser store
 - Synced note summaries and consumable-note counts
 - Manual client synchronization
 - Visual explanation of local execution, proving, and submission
@@ -65,7 +67,7 @@ For the programmable-privacy track, the project distinguishes these categories e
 
 ## Run locally
 
-Requirements: Node.js 22.13 or newer.
+Requirements: Node.js 22.18 or newer.
 
 ```bash
 npm install
@@ -77,6 +79,14 @@ Production validation builds the app and runs all render/policy tests:
 ```bash
 npm test
 ```
+
+## Current testnet transfer lab
+
+The live workspace pins both SDK packages to **0.17.3**. The September v0.16 article is historical: on 2026-10-17 the public testnet rejected SDK 0.16.3 (embedded client 0.16.1). SDK 0.17.3 connected successfully. The native fee asset is read from chain configuration, never guessed from the faucet service wallet address.
+
+See [Private transfer recipe and migration notes](docs/private-transfer-recipe.md). The standard P2ID flow does **not** enforce the custom stablecoin policy scaffold.
+
+`npm run test:transfer` runs actual client execution and proving against the SDK mock chain, including private note file import, confirmed balance checks and replay rejection. The default mock chain has zero fees. Live paid-testnet and Note Transport Service validation require funded accounts; mock success does not prove either service works.
 
 ## Project structure
 
