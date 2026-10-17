@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MidenClient, FaucetType, createP2IDNote, getWrappedSdk } from "@miden-sdk/miden-sdk";
-import { expectedBalances, parseAmount, readBalances, submitRequest } from "../app/lib/private-transfer.ts";
+import { buildPrivateOutputRequest, expectedBalances, parseAmount, readBalances, submitRequest } from "../app/lib/private-transfer.ts";
 
 test("base-unit parsing rejects fractions, negatives and protocol overflow without losing precision", () => {
   assert.equal(parseAmount("9007199254740993"), 9007199254740993n);
@@ -29,7 +29,7 @@ test("real SDK mock chain: private P2ID transfer, note-file import, consume, ref
     const note = createP2IDNote({ from: alice, to: bob, assets: { token: faucet, amount: 100n }, type: "private" });
     const outputs = new NoteArray(); outputs.push(note);
     const builder = await client.feeAwareTransactionRequestBuilder(alice);
-    const request = builder.withOwnOutputNotes(outputs).build();
+    const request = buildPrivateOutputRequest(builder, outputs);
     const stages = [];
     const sent = await submitRequest(client, transfer.sender, request, stage => stages.push(stage), async receipt => {
       assert.ok(receipt.txId); assert.ok(receipt.noteId);
@@ -53,7 +53,7 @@ test("real SDK mock chain: private P2ID transfer, note-file import, consume, ref
     await assert.rejects(client.transactions.consume({ account: bob, notes: [sent.noteId] }));
     funding.forEach(note => note.free?.());
     input.free?.(); record.free?.(); consumeBuilder.free?.(); consumeRequest.free?.();
-    note.free?.(); outputs.free?.(); builder.free?.(); request.free?.(); file.free?.();
+    note.free?.(); request.free?.(); file.free?.();
     alice.free?.(); bob.free?.(); faucet.free?.();
   } finally { client.terminate(); }
 });

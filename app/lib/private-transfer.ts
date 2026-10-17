@@ -1,4 +1,4 @@
-import type { MidenClient, TransactionRequest } from "@miden-sdk/miden-sdk";
+import type { MidenClient, NoteArray, TransactionRequest, TransactionRequestBuilder } from "@miden-sdk/miden-sdk";
 
 export type Fee = { assetId: string; amount: string };
 export type Receipt = { txId: string; noteId: string | null; fees: Fee[] };
@@ -29,6 +29,14 @@ export function expectedBalances(before: Balances, transfer: Transfer, sendFees:
     sender: before.sender - amount - paidInToken(sendFees),
     recipient: before.recipient + amount - paidInToken(consumeFees),
   };
+}
+
+// withOwnOutputNotes takes ownership of the array at the WASM boundary.
+// Freeing that moved array throws before execution in browsers (native tests do not model this).
+export function buildPrivateOutputRequest(builder: TransactionRequestBuilder, outputs: NoteArray): TransactionRequest {
+  const configured = builder.withOwnOutputNotes(outputs);
+  try { return configured.build(); }
+  finally { configured.free?.(); builder.free?.(); }
 }
 
 export async function submitRequest(

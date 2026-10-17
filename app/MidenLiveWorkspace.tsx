@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AccountInterface, MidenClient, NetworkId, NoteArray, createP2IDNote } from "@miden-sdk/miden-sdk/lazy";
-import { expectedBalances, parseAmount, readBalances, submitRequest, type Balances, type Receipt, type Transfer } from "./lib/private-transfer";
+import { buildPrivateOutputRequest, expectedBalances, parseAmount, readBalances, submitRequest, type Balances, type Receipt, type Transfer } from "./lib/private-transfer";
 
 const STORE = "miden-private-notes-lab-v017";
 type Wallet = { id: string; address: string };
@@ -84,8 +84,8 @@ export default function MidenLiveWorkspace() {
     const outputs = new NoteArray();
     outputs.push(note);
     const builder = await client.feeAwareTransactionRequestBuilder(transfer.sender);
-    const request = builder.withOwnOutputNotes(outputs).build();
-    outputs.free(); note.free(); builder.free();
+    const request = buildPrivateOutputRequest(builder, outputs);
+    note.free();
     try { await submitRequest(client, transfer.sender, request, setStage, setSent); }
     finally { request.free(); }
     setStage("Transfer confirmed. Deliver the private note, then consume it as the recipient.");
