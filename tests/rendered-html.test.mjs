@@ -35,11 +35,11 @@ test("keeps live SDK data separate from demo data", async () => {
   const source = await readFile(new URL("../app/MidenLiveWorkspace.tsx", import.meta.url), "utf8");
   const packageJson = await readFile(new URL("../package.json", import.meta.url), "utf8");
 
-  assert.match(source, /@miden-sdk\/react\/lazy/);
-  assert.match(source, /rpcUrl: "testnet"/);
+  assert.match(source, /@miden-sdk\/miden-sdk\/lazy/);
+  assert.match(source, /MidenClient.createTestnet/);
   assert.match(shellSource, /Demo dataset/);
-  assert.match(source, /useCreateWallet/);
-  assert.match(source, /useNotes/);
+  assert.match(source, /accounts.create/);
+  assert.match(source, /notes.fetchPrivate/);
   assert.match(shellSource, /ssr: false/);
   assert.match(packageJson, /"@miden-sdk\/react"/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
