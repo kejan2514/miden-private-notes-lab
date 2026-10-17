@@ -1,4 +1,4 @@
-import type { MidenClient, NoteArray, TransactionRequest, TransactionRequestBuilder } from "@miden-sdk/miden-sdk";
+import type { InputNoteRecord, MidenClient, NoteArray, TransactionRequest, TransactionRequestBuilder } from "@miden-sdk/miden-sdk";
 
 export type Fee = { assetId: string; amount: string };
 export type Receipt = { txId: string; noteId: string | null; fees: Fee[] };
@@ -18,6 +18,15 @@ export async function readBalances(client: MidenClient, transfer: Transfer): Pro
   const sender = await client.accounts.getBalance(transfer.sender, transfer.token);
   const recipient = await client.accounts.getBalance(transfer.recipient, transfer.token);
   return { sender, recipient };
+}
+
+export function selectFundingNotes(notes: InputNoteRecord[], pendingTransferNoteId: string | null): InputNoteRecord[] {
+  if (!pendingTransferNoteId) return notes;
+  return notes.filter(note => {
+    const id = note.id();
+    try { return id?.toString() !== pendingTransferNoteId; }
+    finally { id?.free?.(); }
+  });
 }
 
 export function expectedBalances(before: Balances, transfer: Transfer, sendFees: Fee[], consumeFees: Fee[]): Balances {

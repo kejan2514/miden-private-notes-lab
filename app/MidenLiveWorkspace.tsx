@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AccountInterface, MidenClient, NetworkId, NoteArray, createP2IDNote } from "@miden-sdk/miden-sdk/lazy";
-import { buildPrivateOutputRequest, expectedBalances, parseAmount, readBalances, submitRequest, type Balances, type Receipt, type Transfer } from "./lib/private-transfer";
+import { buildPrivateOutputRequest, expectedBalances, parseAmount, readBalances, selectFundingNotes, submitRequest, type Balances, type Receipt, type Transfer } from "./lib/private-transfer";
 
 const STORE = "miden-private-notes-lab-v017";
 type Wallet = { id: string; address: string };
@@ -106,6 +106,8 @@ export default function MidenLiveWorkspace() {
   async function consume(client: MidenClient) {
     if (!sent?.noteId || !before) throw new Error("Send and deliver a private note first.");
     await client.sync();
+    const nativeBalance = await client.accounts.getBalance(transfer.recipient, feeToken);
+    if (nativeBalance === 0n) throw new Error("Recipient has no fee-token balance. Request free faucet tokens for the RECIPIENT address, claim recipient funding notes, then retry Consume. Do not send the transfer again.");
     const record = await client.notes.get(sent.noteId);
     if (!record) throw new Error("Note not found. Use Deliver / retry delivery first.");
     const note = record.toInputNote();
@@ -134,10 +136,21 @@ export default function MidenLiveWorkspace() {
     if (!account) throw new Error("Choose an account first.");
     await client.sync();
     const available = await client.notes.listAvailable({ account });
-    if (!available.length) throw new Error("No consumable funding notes. Request free testnet tokens from the faucet, then retry.");
+    const funding = selectFundingNotes(available, sent?.noteId ?? null);
+    if (!funding.length) {
+      available.forEach(note => note.free());
+      throw new Error("No separate funding notes found. Request free testnet tokens for this exact account address, then retry. The pending transfer is kept separate.");
+    }
+    const oldBalance = await client.accounts.getBalance(account, transfer.token);
     try {
-      await client.transactions.consume({ account, notes: available, waitForConfirmation: true, timeout: 120_000 });
-      setStage("Funding notes consumed. Read balances before sending.");
+      await client.transactions.consume({ account, notes: funding, waitForConfirmation: true, timeout: 120_000 });
+      const updated = await readBalances(client, transfer);
+      setBalances(updated);
+      if (sent && account === transfer.recipient) {
+        const fundingDelta = updated.recipient - oldBalance;
+        setBefore(current => current ? { ...current, recipient: current.recipient + fundingDelta } : current);
+      }
+      setStage(sent ? "Recipient funding claimed. The original private transfer is still pending; retry Consume as recipient." : "Funding notes consumed. Read balances before sending.");
     } finally { available.forEach(note => note.free()); }
   }
 
@@ -157,7 +170,7 @@ export default function MidenLiveWorkspace() {
     <p><a href="https://faucet.testnet.miden.io" target="_blank" rel="noreferrer">Open testnet faucet</a> · Never use valuable assets in this educational lab.</p>
     <div className="transfer-actions">
       <button className="ghost-button" disabled={disabled || Boolean(sent)} onClick={() => void run(client => claimFunding(client, transfer.sender))}>Claim sender funding notes</button>
-      <button className="ghost-button" disabled={disabled || Boolean(sent)} onClick={() => void run(client => claimFunding(client, transfer.recipient))}>Claim recipient funding notes</button>
+      <button className="ghost-button" disabled={disabled || Boolean(consumed)} onClick={() => void run(client => claimFunding(client, transfer.recipient))}>Claim recipient funding notes</button>
       <button className="ghost-button" disabled={disabled} onClick={() => void run(async client => { setBalances(await readBalances(client, transfer)); setStage("Synced balances refreshed"); })}>Sync and read balances</button>
       <button className="primary-button" disabled={disabled || Boolean(sent)} onClick={() => void run(send)}>1. Send private note</button>
       <button className="ghost-button" disabled={disabled || !sent || Boolean(consumed)} onClick={() => void run(deliver)}>2. Deliver / retry delivery</button>

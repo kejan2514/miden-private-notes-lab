@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MidenClient, FaucetType, createP2IDNote, getWrappedSdk } from "@miden-sdk/miden-sdk";
-import { buildPrivateOutputRequest, expectedBalances, parseAmount, readBalances, submitRequest } from "../app/lib/private-transfer.ts";
+import { buildPrivateOutputRequest, expectedBalances, parseAmount, readBalances, selectFundingNotes, submitRequest } from "../app/lib/private-transfer.ts";
 
 test("base-unit parsing rejects fractions, negatives and protocol overflow without losing precision", () => {
   assert.equal(parseAmount("9007199254740993"), 9007199254740993n);
@@ -42,13 +42,26 @@ test("real SDK mock chain: private P2ID transfer, note-file import, consume, ref
     await client.sync();
     const record = await client.notes.get(sent.noteId);
     assert.ok(record);
+    // Recover an unfunded recipient without accidentally consuming the pending transfer.
+    await client.transactions.mint({ account: faucet, to: bob, amount: 50n, type: "public" });
+    await client.proveBlock(); await client.sync();
+    const availableToBob = await client.notes.listAvailable({ account: bob });
+    const separateFunding = selectFundingNotes(availableToBob, sent.noteId);
+    assert.equal(separateFunding.length, 1);
+    await client.transactions.consume({ account: bob, notes: separateFunding });
+    await client.proveBlock(); await client.sync();
+    assert.equal(await client.accounts.getBalance(bob, faucet), 50n);
+    const remaining = await client.notes.listAvailable({ account: bob });
+    assert.ok(remaining.some(note => note.id().toString() === sent.noteId));
+    availableToBob.forEach(note => note.free?.()); remaining.forEach(note => note.free?.());
     const input = record.toInputNote();
     const consumeBuilder = await client.feeAwareTransactionRequestBuilder(bob);
     const consumeRequest = consumeBuilder.withExplicitInputNote(input).build();
     const consumed = await submitRequest(client, transfer.recipient, consumeRequest, stage => stages.push(stage), async () => { await client.proveBlock(); });
     assert.ok(consumed.txId);
     const after = await readBalances(client, transfer);
-    assert.deepEqual(after, { sender: 900n, recipient: 100n });
+    assert.deepEqual(after, { sender: 900n, recipient: 150n });
+    assert.deepEqual(expectedBalances({ sender: 1000n, recipient: 50n }, transfer, sent.fees, consumed.fees), after);
     assert.ok(stages.some(stage => stage.startsWith("Generating the proof locally")));
     await assert.rejects(client.transactions.consume({ account: bob, notes: [sent.noteId] }));
     funding.forEach(note => note.free?.());

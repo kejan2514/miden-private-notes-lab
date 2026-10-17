@@ -23,6 +23,8 @@ Select **Connect testnet**. The client discovers the current fee faucet from syn
 4. **Sync and read balances** fetches current state. **Send private note** syncs again, captures the baseline, explicitly constructs a private P2ID note, executes, reads the actual fee, proves locally, submits, applies, and waits for commitment.
 5. **Deliver / retry delivery** waits for send confirmation, streams the stored private output note through Note Transport Service, fetches private notes, and syncs. Retrying this step never submits a second transfer.
 6. **Consume as recipient** imports the recorded input note into a fee-aware request, executes, proves, submits, applies and waits for confirmation.
+If the recipient has no fee-token balance, request faucet tokens for the recipient address and use **Claim recipient funding notes** even after the send. This action excludes the pending private transfer from funding claims and adjusts the verification baseline by the net funding balance change. Then retry Consume; never repeat Send.
+
 7. **Verify confirmed balances** syncs and reads both vault balances again. The sender loses the amount plus its send fee if paid in the transferred token. The recipient gains the amount minus its consume fee if paid in that token. Fees in another token are displayed but do not affect this token's balance equation.
 
 The UI locks the transfer parameters after send submission. A synchronous guard serializes complete action sequences. There is no background polling that can interleave WASM calls. Waits are bounded; a timeout does not mean rejection. Transaction IDs are saved to UI state immediately after successful submission, before persistence and confirmation, so a later failure does not enable the Send button again.
